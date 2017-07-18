@@ -1,12 +1,15 @@
 from os.path import join
 from .utils import get_test_data_path
-from pliers.filters import WordStemmingFilter
-from pliers.stimuli import ComplexTextStim
+from pliers.filters import (WordStemmingFilter,
+                            ColorSpaceFilter)
+from pliers.stimuli import ComplexTextStim, ImageStim
 from nltk import stem as nls
 import pytest
+import numpy as np
 
 
 TEXT_DIR = join(get_test_data_path(), 'text')
+IMAGE_DIR = join(get_test_data_path(), 'image')
 
 
 def test_word_stemming_filter():
@@ -38,3 +41,15 @@ def test_word_stemming_filter():
     # Fails on invalid values
     with pytest.raises(ValueError):
         filt = WordStemmingFilter(stemmer='nonexistent_stemmer')
+
+
+def test_color_space_filter():
+    stim = ImageStim(join(IMAGE_DIR, 'apple.jpg'))
+    filt = ColorSpaceFilter('RGB', 'HSV')
+    hsv_stim = filt.transform(stim)
+    assert stim.data.shape == hsv_stim.data.shape
+
+    stim = ImageStim(data=[[[0.0, 0.0, 255.0]]])
+    # One blue pixel maps to 240 degree hue, 100% sat, 100% value
+    hsv_stim = filt.transform(stim)
+    assert np.array_equal(hsv_stim.data, ([[[240.0/360.0, 1.0, 255.0]]]))
