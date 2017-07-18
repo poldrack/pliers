@@ -44,10 +44,14 @@ def test_word_stemming_filter():
 
 
 def test_color_space_filter():
+    pytest.importorskip('skimage')
     stim = ImageStim(join(IMAGE_DIR, 'apple.jpg'))
     filt = ColorSpaceFilter('RGB', 'HSV')
+    gray_filt = ColorSpaceFilter('RGB', 'GRAY')
     hsv_stim = filt.transform(stim)
+    gray_stim = gray_filt.transform(stim)
     assert stim.data.shape == hsv_stim.data.shape
+    assert stim.data.shape[:2] == gray_stim.data.shape  # Channels removed
 
     stim = ImageStim(data=[[[0.0, 0.0, 255.0]]])
     # One blue pixel maps to 240 degree hue, 100% sat, 100% value

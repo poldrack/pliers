@@ -4,7 +4,7 @@ from pliers.stimuli import ImageStim
 from .base import Filter
 
 try:
-    from skimage.color import convert_colorspace
+    from skimage.color import convert_colorspace, gray2rgb, rgb2gray
 except ImportError:
     pass
 
@@ -24,7 +24,8 @@ class ColorSpaceFilter(ImageFilter):
         target (str): target color space.
 
         Valid color space strings are
-        ``['RGB', 'HSV', 'RGB CIE', 'XYZ', 'YUV', 'YIQ', 'YPbPr', 'YCbCr']``.
+        ``['GRAY', 'GREY', 'RGB', 'HSV', 'RGB CIE', 'XYZ', 'YUV', 'YIQ',
+        'YPbPr', 'YCbCr']``.
     '''
 
     _log_attributes = ('source', 'target')
@@ -35,6 +36,16 @@ class ColorSpaceFilter(ImageFilter):
         super(ImageFilter, self).__init__()
 
     def _filter(self, stim):
-        data = convert_colorspace(stim.data, self.source, self.target)
+        data = stim.data
+        if self.source in ['GRAY', 'GREY']:
+            data = gray2rgb(data)
+            self.source = 'RGB'
+        to_gray = False
+        if self.target in ['GRAY', 'GREY']:
+            self.target = 'RGB'
+            to_gray = True
+        data = convert_colorspace(data, self.source, self.target)
+        if to_gray:
+            data = rgb2gray(data)
         return ImageStim(filename=stim.filename, data=data,
                          onset=stim.onset, duration=stim.duration)
