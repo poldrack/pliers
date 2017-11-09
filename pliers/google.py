@@ -1,16 +1,10 @@
-import base64
 import os
 from pliers.transformers import Transformer, BatchTransformerMixin
 from pliers.utils import (EnvironmentKeyMixin, attempt_to_import,
                           verify_dependencies)
 
 
-googleapiclient = attempt_to_import('googleapiclient', fromlist=['discovery'])
-oauth_client = attempt_to_import('oauth2client.client', 'oauth_client',
-                                 ['GoogleCredentials'])
-
-
-DISCOVERY_URL = 'https://{api}.googleapis.com/$discovery/rest?version={apiVersion}'
+google_cloud = attempt_to_import('google.cloud', 'google_cloud', ['vision'])
 
 
 class GoogleAPITransformer(Transformer, EnvironmentKeyMixin):
@@ -18,9 +12,9 @@ class GoogleAPITransformer(Transformer, EnvironmentKeyMixin):
     _env_keys = 'GOOGLE_APPLICATION_CREDENTIALS'
     _log_attributes = ('handle_annotations',)
 
-    def __init__(self, discovery_file=None, api_version='v1', max_results=100,
-                 num_retries=3, handle_annotations='prefix'):
-        verify_dependencies(['googleapiclient', 'oauth_client'])
+    def __init__(self, discovery_file=None, max_results=100,
+                 handle_annotations='prefix'):
+        verify_dependencies(['google_cloud'])
         if discovery_file is None:
             if 'GOOGLE_APPLICATION_CREDENTIALS' not in os.environ:
                 raise ValueError("No Google application credentials found. "
@@ -30,26 +24,20 @@ class GoogleAPITransformer(Transformer, EnvironmentKeyMixin):
                                  "environment variable.")
             discovery_file = os.environ['GOOGLE_APPLICATION_CREDENTIALS']
 
-        self.credentials = oauth_client.GoogleCredentials.from_stream(discovery_file)
+        self.discovery_file = discovery_file
         self.max_results = max_results
-        self.num_retries = num_retries
-        self.service = googleapiclient.discovery.build(self.api_name, api_version,
-                                                       credentials=self.credentials,
-                                                       discoveryServiceUrl=DISCOVERY_URL)
         self.handle_annotations = handle_annotations
         super(GoogleAPITransformer, self).__init__()
-
-    def _query_api(self, request):
-        resource = getattr(self.service, self.resource)()
-        request = resource.annotate(body={'requests': request})
-        return request.execute(num_retries=self.num_retries)['responses']
 
 
 class GoogleVisionAPITransformer(BatchTransformerMixin, GoogleAPITransformer):
 
-    api_name = 'vision'
-    resource = 'images'
     _batch_size = 10
+
+    def __init__(self, **kwargs):
+        super(GoogleVisionAPITransformer, self).__init__(**kwargs)
+        creds = google_cloud.vision.Client.from_service_account_json(self.discovery_file)._credentials
+        self.client = google_cloud.vision.ImageAnnotatorClient(credentials=creds)
 
     def _build_request(self, stims):
         request = []
@@ -58,13 +46,13 @@ class GoogleVisionAPITransformer(BatchTransformerMixin, GoogleAPITransformer):
                 with open(filename, 'rb') as f:
                     img_data = f.read()
 
-            content = base64.b64encode(img_data).decode()
+            content = img_data
             request.append(
                 {
                     'image': {'content': content},
                     'features': [{
                         'type': self.request_type,
-                        'maxResults': self.max_results,
+                        'max_results': self.max_results,
                     }]
                 })
 
