@@ -126,7 +126,6 @@ class GoogleVisionAPISafeSearchExtractor(GoogleVisionAPIExtractor):
     def _parse_annotations(self, annotation):
         keys = []
         vals = []
-        print annotation
         for k, v in annotation.ListFields():
             keys.append(k.name)
             vals.append((v - 1) / 4.0)
